@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strings"
 	"sync"
 )
 
@@ -13,8 +14,10 @@ var searchWord string
 var searchWordBytes []byte
 var searchWordBytesLength int
 var wg sync.WaitGroup
+var outputStrings [256]strings.Builder
 
 func main() {
+
 	searchWord = "ala"
 	searchWordBytes = []byte(searchWord)
 	searchWordBytesLength = len(searchWordBytes)
@@ -25,17 +28,26 @@ func main() {
 	fileInfo, _ := file.Stat()
 	fmt.Printf("Wielkość pliku %db\n", fileInfo.Size())
 
-	partSieze := fileInfo.Size() / 128
+	partSieze := fileInfo.Size() / 256
 
-	wg.Add(128)
+	wg.Add(256)
 
-	for i := 0; i < 128; i++ {
+	for i := 0; i < 256; i++ {
 		go readFileChunk(filePath, int64(i)*partSieze, int(partSieze), i)
 	}
 
 	// reader := bufio.NewReader(os.Stdin)
 	// reader.ReadLine()
 	wg.Wait()
+
+	f, err := os.Create("result123")
+	check(err, 0)
+
+	for _, value := range outputStrings {
+		//fmt.Printf("%s", str)
+		f.WriteString(value.String())
+	}
+	f.Close()
 	fmt.Printf("Koniec\n")
 }
 
@@ -81,6 +93,8 @@ func readFile(filePath string, start int64, length int64, filePart int) {
 
 func readFileChunk(filename string, startPositon int64, length int, filePart int) {
 
+	var sb strings.Builder
+
 	file, err := os.Open(filename) // For read access.
 	if err != nil {
 		log.Fatal(err)
@@ -106,16 +120,24 @@ func readFileChunk(filename string, startPositon int64, length int, filePart int
 			}
 			if separatorFounded == 0 {
 				//fmt.Printf("%d %d\n", lastSeparatorPosition, i)
-				findWord(data[lastSeparatorPosition:i])
+				var matchedLine = findWord(data[lastSeparatorPosition:i])
+				if matchedLine != nil {
+					sb.Write(matchedLine)
+				}
+
 				lastSeparatorPosition = i + 1
 
 			}
 		}
 	}
+
 	defer wg.Done()
+	outputStrings[filePart] = sb
+	fmt.Printf("koniec przetwarzania fragmentu %d \n", filePart)
+
 }
 
-func findWord(data []byte) {
+func findWord(data []byte) []byte {
 	for i := 0; i < len(data); i++ {
 		if data[i] == searchWordBytes[0] {
 			var founded = searchWordBytesLength - 1
@@ -126,11 +148,12 @@ func findWord(data []byte) {
 
 					if founded == 0 {
 						//fmt.Printf("%s\n", string(data))
-						return
+						return data
 					}
 				}
 
 			}
 		}
 	}
+	return nil
 }
