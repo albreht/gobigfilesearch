@@ -59,7 +59,7 @@ func readFile(filePath string, start int64, length int64, filePart int) {
 
 	for {
 
-		offset += 1
+		offset++
 		o2, err := file.Seek(offset*1024, 0)
 		check(err, o2)
 		o2 = 0
